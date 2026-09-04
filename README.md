@@ -16,12 +16,6 @@ Users can ask financial questions, inspect source excerpts, calculate financial 
 
 ---
 
-## Screenshots
-
-> Add product screenshots here.
-
----
-
 ## Overview
 
 Financial reports contain large amounts of useful information, but finding the right evidence and turning it into comparable financial insight can be time-consuming.
