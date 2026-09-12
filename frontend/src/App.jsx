@@ -1,15 +1,120 @@
-import React,{useEffect,useState}from'react';import{api}from'./lib/api';import{LineChart,Line,AreaChart,Area,XAxis,YAxis,Tooltip,ResponsiveContainer,CartesianGrid}from'recharts';import'./index.css';
-const metrics=['revenue','revenue_growth','gross_margin','operating_margin','net_margin','roe','roa','free_cash_flow','eps','debt_to_equity'];
-export default function App(){const[companies,setCompanies]=useState([]),[company,setCompany]=useState('aurelius'),[view,setView]=useState('Ask'),[q,setQ]=useState(''),[result,setResult]=useState(null),[loading,setLoading]=useState(false),[theme,setTheme]=useState(localStorage.theme||'dark');useEffect(()=>{api.companies().then(setCompanies)},[]);useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.theme=theme},[theme]);const ask=async(text=q)=>{if(!text.trim())return;setLoading(true);try{setResult(await api.query({question:text,company,period:'FY2025'}));setView('Ask')}catch(e){setResult({error:e.message})}finally{setLoading(false)}};const nav=['Ask','Ratios','Peers','Trends','Flags','Docs','History','Settings'];return <><header className="top wrap"><button className="logo serif" onClick={()=>{setView('Ask');setResult(null)}}>finsight</button><nav>{nav.map(n=><button key={n} className={view===n?'active':''} onClick={()=>setView(n)}><i/> {n}</button>)}</nav><div className="controls"><select aria-label="Select company" value={company} onChange={e=>setCompany(e.target.value)}>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button className="theme" aria-label="Toggle theme" onClick={()=>setTheme(theme==='dark'?'light':'dark')}>{theme==='dark'?'☼':'☾'}</button></div></header><main className="wrap">{view==='Ask'?(result?<Result result={result} q={q} setQ={setQ} ask={ask} company={company}/>:<Ask q={q} setQ={setQ} ask={ask}/>):view==='Ratios'?<Ratios company={company}/>:view==='Peers'?<Peers company={company}/>:view==='Trends'?<Trends company={company}/>:view==='Flags'?<Flags company={company}/>:view==='Docs'?<Docs/>:view==='History'?<History reopen={(x)=>{setCompany(x.company);setQ(x.question);ask(x.question)}}/>:<Settings theme={theme} setTheme={setTheme}/>}</main><footer className="footer wrap"><span>finsight © 2026 · Designed & built by Varshith Reddy</span><span><a href="mailto:varshithreddyy6@gmail.com">Email</a><a href="https://linkedin.com/in/varshithreddyvangeti">LinkedIn</a><a href="https://github.com/varshreddyy6">GitHub</a></span></footer></>}
-function Ask({q,setQ,ask}){return <section className="hero"><div className="eyebrow">EQUITY RESEARCH, ACCELERATED</div><h1 className="serif">Financial reports,<br/>finally <em>understood.</em></h1><p className="lead">Ask questions across financial statements, management commentary, trends and risk.</p><Search q={q} setQ={setQ} ask={ask}/><div className="prompts">{['Operating margin over 5 years','What risks did management highlight?','Compare leverage with peers','Show the major red flags'].map(x=><button key={x} onClick={()=>{setQ(x);ask(x)}}>→ {x}</button>)}</div><div className="strip"><b>3</b> COMPANIES <b>21+</b> FILINGS <b>5</b> YEARS <b>10</b> RATIOS</div></section>}
-function Search({q,setQ,ask}){return <form className="search" onSubmit={e=>{e.preventDefault();ask()}}><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Ask anything about the business..." aria-label="Ask a financial question"/><button>→</button></form>}
-function Result({result,q,setQ,ask,company}){if(result.error)return <Error retry={()=>ask(q)} text={result.error}/>;const data=result.chart?.data||[];return <section className="research"><Search q={q} setQ={setQ} ask={ask}/><div className="eyebrow">ANSWER · {result.intent.toUpperCase()} <span className="period">FY2025</span></div><h2 className="serif">The signal, clearly stated.</h2><div className="answer panel"><p>{result.answer}</p>{data.length>0&&<Chart data={data}/>}</div><div className="eyebrow">SOURCE EVIDENCE</div>{(result.citations||[]).map((c,i)=><article className="evidence" key={c.chunk_id||i}><div><b>{i+1}. {c.section}</b><small>{c.source_file} · score {c.score}</small></div><blockquote>{c.text}</blockquote></article>)}<div className="prompts follow">{(result.follow_ups||[]).map(x=><button key={x} onClick={()=>{setQ(x);ask(x)}}>→ {x}</button>)}</div></section>}
-function Chart({data}){return <div className="chart"><ResponsiveContainer width="100%" height={300}><AreaChart data={data}><defs><linearGradient id="amber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--accent)" stopOpacity=".28"/><stop offset="1" stopColor="var(--accent)" stopOpacity="0"/></linearGradient></defs><CartesianGrid stroke="var(--border)" vertical={false}/><XAxis dataKey="period" stroke="var(--muted)"/><YAxis stroke="var(--muted)"/><Tooltip contentStyle={{background:'var(--surface-raised)',border:'1px solid var(--border)',color:'var(--text)'}}/><Area type="monotone" dataKey="value" stroke="var(--accent)" fill="url(#amber)" strokeWidth={2}/></AreaChart></ResponsiveContainer><div className="table">{data.map(x=><span key={x.period}>{x.period} <b>{x.value}</b></span>)}</div></div>}
-function Ratios({company}){const[d,setD]=useState();useEffect(()=>{api.ratios(company).then(setD)},[company]);return <View title="The business became more profitable.">{d?<div className="panel"><div className="metric">{d.metrics.operating_margin}%</div><div className="eyebrow">OPERATING MARGIN · FY2025</div>{Object.entries(d.metrics).map(([k,v])=><div className="row" key={k}><span>{k.replaceAll('_',' ')}</span><b>{v??'—'}</b></div>)}</div>:<Skeleton/>}</View>}
-function Trends({company}){const[m,setM]=useState('operating_margin'),[d,setD]=useState();useEffect(()=>{api.trends(company,m).then(setD)},[company,m]);return <View title={m.replaceAll('_',' ')}><div className="selector">{metrics.map(x=><button className={m===x?'selected':''} key={x} onClick={()=>setM(x)}>{x.replaceAll('_',' ')}</button>)}</div>{d?<div className="panel"><Chart data={d.data}/></div>:<Skeleton/>}</View>}
-function Peers({company}){const[mode,setMode]=useState('absolute'),[d,setD]=useState();useEffect(()=>{api.peers(company,'operating_margin',mode).then(setD)},[company,mode]);return <View title="Who operates the cleanest?"><div className="toggle"><button onClick={()=>setMode('absolute')} className={mode==='absolute'?'selected':''}>ABSOLUTE</button><button onClick={()=>setMode('percentile')} className={mode==='percentile'?'selected':''}>PERCENTILE</button></div><div className="panel">{d?.data.map(x=><div className="peer" key={x.company}><span>{x.name}</span><strong>{mode==='percentile'?x.percentile+'%':x.value+'%'}</strong><div><i style={{width:`${Math.max(5,Math.min(100,x.value/25*100))}%`}}/></div></div>)||<Skeleton/>}</div></View>}
-function Flags({company}){const[d,setD]=useState();useEffect(()=>{api.flags(company).then(setD)},[company]);return <View title="Read between the lines."><div className="panel"><div className="metric">{d?.flags.length??'—'}</div><div className="eyebrow">RED FLAGS DETECTED</div>{d?.flags.map((f,i)=><article className="flag" key={f.category+i}><small>0{i+1} · {f.severity}</small><h3>{f.category}</h3><blockquote>{f.quote}</blockquote><p>{f.explanation}</p><span>{f.source}</span></article>)||<Skeleton/>}</div></View>}
-function Docs(){const[d,setD]=useState();useEffect(()=>{api.documents().then(setD)},[]);return <View title="The research archive."><div className="panel">{d?.map(x=><div className="row" key={x.filename}><span><b>{x.source_type}</b><small>{x.filename}</small></span><b>{x.indexed?'INDEXED':'PROCESSING'}</b></div>)||<Skeleton/>}</div></View>}
-function History({reopen}){const[d,setD]=useState();useEffect(()=>{api.history().then(setD)},[]);return <View title="Recent research."><div className="panel">{d?.map(x=><button className="history" key={x.id} onClick={()=>reopen(x)}><b>{x.question}</b><small>{x.company} · {x.period} · {x.intent} · {x.timestamp}</small><p>{x.answer_summary}</p></button>)||<Skeleton/>}</div></View>}
-function Settings({theme,setTheme}){return <View title="Settings."><div className="panel"><div className="row"><span>DISPLAY</span><button onClick={()=>setTheme(theme==='dark'?'light':'dark')}>{theme.toUpperCase()} · toggle</button></div><div className="row"><span>ANSWER ENGINE</span><b>OFFLINE</b></div><div className="row"><span>MOTION</span><b>STANDARD</b></div></div></View>}
-function View({title,children}){return <section className="content"><div className="eyebrow">FINANCIAL INTELLIGENCE</div><h1 className="serif section-title">{title}</h1>{children}</section>}function Skeleton(){return <div className="panel skeleton">Loading indexed analysis…</div>}function Error({text,retry}){return <div className="panel error"><h2 className="serif">We couldn't complete the analysis.</h2><p>{text}</p><button onClick={retry}>Try again →</button></div>}
+import React, { useEffect, useState } from 'react';
+import { motion, useReducedMotion, MotionConfig } from 'framer-motion';
+import { api } from './lib/api';
+import Landing from './landing/Landing';
+import LandingFooter from './landing/LandingFooter';
+import Top from './components/Top';
+import Ask from './views/Ask';
+import Result from './views/Result';
+import Ratios from './views/Ratios';
+import Peers from './views/Peers';
+import Trends from './views/Trends';
+import Flags from './views/Flags';
+import Docs from './views/Docs';
+import History from './views/History';
+import Settings from './views/Settings';
+import './index.css';
+
+const NAV = ['Ask', 'Ratios', 'Peers', 'Trends', 'Flags', 'Docs', 'History', 'Settings'];
+const EASE = [0.22, 1, 0.36, 1];
+
+export default function App() {
+  const [mode, setMode] = useState('landing');
+  const [companies, setCompanies] = useState([]);
+  const [company, setCompany] = useState('aurelius');
+  const [view, setView] = useState('Ask');
+  const [q, setQ] = useState('');
+  const [result, setResult] = useState(null);
+  const [theme, setTheme] = useState(localStorage.theme || 'dark');
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    api.companies().then(setCompanies);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.theme = theme;
+  }, [theme]);
+
+  const ask = async (text = q) => {
+    if (!text.trim()) return;
+    try {
+      setResult(await api.query({ question: text, company, period: 'FY2025' }));
+      setView('Ask');
+    } catch (e) {
+      setResult({ error: e.message });
+    }
+  };
+
+  const launch = (view) => {
+    setView(view || 'Ask');
+    setMode('app');
+    window.scrollTo(0, 0);
+  };
+
+  const home = () => {
+    setMode('landing');
+    window.scrollTo(0, 0);
+  };
+
+  if (mode === 'landing') {
+    return (
+      <MotionConfig reducedMotion="user">
+        <Landing onLaunch={launch} theme={theme} setTheme={setTheme} />
+      </MotionConfig>
+    );
+  }
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <Top
+        nav={NAV}
+        view={view}
+        setView={setView}
+        onHome={home}
+        company={company}
+        setCompany={setCompany}
+        companies={companies}
+        theme={theme}
+        setTheme={setTheme}
+      />
+      <motion.main
+        key={view}
+        className="wrap"
+        initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: EASE }}
+      >
+        {view === 'Ask' ? (
+          result ? (
+            <Result result={result} q={q} setQ={setQ} ask={ask} />
+          ) : (
+            <Ask q={q} setQ={setQ} ask={ask} setView={setView} />
+          )
+        ) : view === 'Ratios' ? (
+          <Ratios company={company} />
+        ) : view === 'Peers' ? (
+          <Peers company={company} />
+        ) : view === 'Trends' ? (
+          <Trends company={company} />
+        ) : view === 'Flags' ? (
+          <Flags company={company} />
+        ) : view === 'Docs' ? (
+          <Docs />
+        ) : view === 'History' ? (
+          <History
+            reopen={(x) => {
+              setCompany(x.company);
+              setQ(x.question);
+              ask(x.question);
+            }}
+          />
+        ) : (
+          <Settings theme={theme} setTheme={setTheme} />
+        )}
+      </motion.main>
+      <LandingFooter onLaunch={(v) => setView(v || 'Ask')} />
+    </MotionConfig>
+  );
+}
